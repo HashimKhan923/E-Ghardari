@@ -192,7 +192,7 @@ class AuthController extends Controller
         $check->save();
         $response = ['status' => true, "message" => "Email Verified Successfully!"];
         $jsonMessage = json_encode($response);
-        $redirectUrl = "https://dragonautomart.com/?jsonMessage=" . urlencode($jsonMessage);
+        $redirectUrl = "https://e-ghardari.vercel.app/?jsonMessage=" . urlencode($jsonMessage);
         
         return redirect($redirectUrl);
 
@@ -201,7 +201,7 @@ class AuthController extends Controller
       {
         $response = ['status' => true, "message" => "something went wrong!"];
         $jsonMessage = json_encode($response);
-        $redirectUrl = "https://dragonautomart.com/?jsonMessage=" . urlencode($jsonMessage);
+        $redirectUrl = "https://e-ghardari.vercel.app/?jsonMessage=" . urlencode($jsonMessage);
         
         return redirect($redirectUrl);
       }
