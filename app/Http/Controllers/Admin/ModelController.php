@@ -4,21 +4,22 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\Brand;
-use Illuminate\Support\Facades\Storage;
+use App\Models\Models;
+use Storage;
 
-class BrandController extends Controller
+class ModelController extends Controller
 {
     public function index()
     {
-      $Brands = Brand::with('model')->get();
+      $Models = Models::all();
 
-      return response()->json(['Brands'=>$Brands]);
+      return response()->json(['Models'=>$Models]);
     }
 
     public function create(Request $request)
     {
-        $new = new Brand();
+        $new = new Models();
+        $new->brand_id = $request->brand_id;
         $new->name = $request->name;
         if($request->file('logo')){
             $file= $request->file('logo');
@@ -31,14 +32,15 @@ class BrandController extends Controller
         $new->meta_description = $request->meta_description;
         $new->save();
 
-        $response = ['status'=>true,"message" => "New Brand Added Successfully!"];
+        $response = ['status'=>true,"message" => "New Models Added Successfully!"];
         return response($response, 200);
 
     }
 
     public function update(Request $request)
     {
-        $update = Brand::where('id',$request->id)->first();
+        $update = Models::where('id',$request->id)->first();
+        $update->brand_id = $request->brand_id;
         $update->name = $request->name;
         if($request->file('logo')){
 
@@ -59,24 +61,24 @@ class BrandController extends Controller
         $update->meta_description = $request->meta_description;
         $update->save();
 
-        $response = ['status'=>true,"message" => "Brand Updated Successfully!"];
+        $response = ['status'=>true,"message" => "Models Updated Successfully!"];
         return response($response, 200);
 
     }
 
     public function delete($id)
     {
-        $file = Brand::find($id);
+        $file = Models::find($id);
 
-        $BrandLogo = 'app/public'.$file->logo;
-        if (Storage::exists($BrandLogo)) {
+        $ModelsLogo = 'app/public'.$file->logo;
+        if (Storage::exists($ModelsLogo)) {
             // Delete the file
-            Storage::delete($BrandLogo);
+            Storage::delete($ModelsLogo);
         }
 
       $file->delete();
 
-        $response = ['status'=>true,"message" => "Brand Deleted Successfully!"];
+        $response = ['status'=>true,"message" => "Models Deleted Successfully!"];
         return response($response, 200);
     }
 }

@@ -11,6 +11,7 @@ use App\Models\Stock;
 use App\Models\Tax;
 use App\Models\WholesaleProduct;
 use App\Models\DealProduct;
+use App\Models\Varient;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 
@@ -49,12 +50,14 @@ class ProductController extends Controller
         $new->user_id = $request->user_id;
         $new->category_id = $request->category_id;
         $new->weight = $request->weight;
+        $new->year = $request->year;
         $new->unit = $request->unit;
         $new->sku = $request->sku;
         $new->brand_id = $request->brand_id;
-        $new->model = $request->model;
+        $new->model_id = $request->model_id;
 
         if ($request->photos) {
+
             // return $request->photos;
             $ProductGallery = array(); // Initialize the array
             foreach ($request->file('photos') as $photo) {
@@ -77,8 +80,6 @@ class ProductController extends Controller
         $new->tags = $request->tags;
         $new->description = $request->description;
         $new->price = $request->price;
-        $new->colors = $request->colors;
-        $new->sizes = $request->sizes;
         // $new->cash_on_delivery = $request->cash_on_delivery;
         $new->featured = $request->featured;
         // $new->todays_deal = $request->todays_deal;
@@ -93,6 +94,20 @@ class ProductController extends Controller
         }
         $new->slug = $request->slug;
         $new->save();
+
+        if($request->color != null)
+        {
+            foreach($request->color as $item)
+            {
+                $color = new Varient();
+                $color->product_id = $new->id;
+                $color->color = $item->color;
+                $color->price = $item->price;
+                $color->available = $item->available;
+                $color->save();
+            }
+
+        }
 
         if($request->discount != null)
         {
@@ -174,12 +189,28 @@ class ProductController extends Controller
         $update->user_id = $request->user_id;
         $update->category_id = $request->category_id;
         $update->weight = $request->weight;
+        $update->year = $request->year;
         $update->unit = $request->unit;
         $update->sku = $request->sku;
         $update->brand_id = $request->brand_id;
-        $update->model = $request->model;
+        $update->model_id = $request->model_id;
 
         if ($request->file('photos')) {
+            if($update->photos != null)
+            {
+                foreach($update->photos as $item)
+                {
+                    $path = 'app/public'.$item;
+                    if (Storage::exists($path)) {
+                        // Delete the file
+                        Storage::delete($path);
+                    }
+                }
+            }
+
+
+
+
             $ProductGallery = array(); // Initialize the array
         
             foreach ($request->file('photos') as $photo) {
@@ -194,6 +225,12 @@ class ProductController extends Controller
 
         if($request->file('thumbnail_img'))
         {
+            $path = 'app/public'.$update->thumbnail_img;
+            if (Storage::exists($path)) {
+                // Delete the file
+                Storage::delete($path);
+            }
+
                 $file= $request->thumbnail_img;
                 $filename= date('YmdHis').$file->getClientOriginalName();
                 $file->storeAs('public', $filename);
@@ -202,7 +239,6 @@ class ProductController extends Controller
         $update->tags = $request->tags;
         $update->description = $request->description;
         $update->price = $request->price;
-        $update->colors = $request->colors;
         $update->sizes = $request->sizes;
         $update->featured = $request->featured;
         $update->todays_deal = $request->todays_deal;
@@ -210,6 +246,12 @@ class ProductController extends Controller
         $update->meta_description = $request->meta_description;
         if($request->file('meta_img'))
         {
+            $path = 'app/public'.$update->meta_img;
+            if (Storage::exists($path)) {
+                // Delete the file
+                Storage::delete($path);
+            }
+
                 $file= $request->meta_img;
                 $filename= date('YmdHis').$file->getClientOriginalName();
                 $file->storeAs('public', $filename);
@@ -217,6 +259,30 @@ class ProductController extends Controller
         }
         $update->slug = $request->slug;
         $update->save();
+
+        if ($request->color != null) {
+            foreach ($request->color as $colorData) {
+                // Check if the color already exists
+                $color = Varient::where('product_id', $update->id)
+                    ->where('color', $colorData['color'])
+                    ->first();
+        
+                if ($color) {
+                    // Update existing color data
+                    $color->price = $colorData['price'];
+                    $color->available = $colorData['available'];
+                    $color->save();
+                } else {
+                    // Create a new color record
+                    $color = new Varient();
+                    $color->product_id = $update->id;
+                    $color->color = $colorData['color'];
+                    $color->price = $colorData['price'];
+                    $color->available = $colorData['available'];
+                    $color->save();
+                }
+            }
+        }
 
         if($request->discount != null)
         {
@@ -353,11 +419,11 @@ class ProductController extends Controller
 
         if($is_published->published == 0)
         {
-            $is_published = 1;
+            $is_published->published = 1;
         }
         else
         {
-            $is_published = 0;
+            $is_published->published = 0;
         }
 
         $is_published->save();
@@ -372,11 +438,11 @@ class ProductController extends Controller
 
         if($is_featured->featured == 0)
         {
-            $is_featured = 1;
+            $is_featured->featured = 1;
         }
         else
         {
-            $is_featured = 0;
+            $is_featured->featured = 0;
         }
 
         $is_featured->save();

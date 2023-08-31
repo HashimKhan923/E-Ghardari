@@ -11,6 +11,7 @@ use App\Models\Stock;
 use App\Models\Tax;
 use App\Models\WholesaleProduct;
 use App\Models\DealProduct;
+use App\Models\Varient;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 
@@ -57,10 +58,11 @@ class WholeSaleProductController extends Controller
         $new->user_id = $request->user_id;
         $new->category_id = $request->category_id;
         $new->weight = $request->weight;
+        $new->year = $request->year;
         $new->unit = $request->unit;
         $new->sku = $request->sku;
         $new->brand_id = $request->brand_id;
-        $new->model = $request->model;
+        $new->model_id = $request->model_id;
 
         if ($request->photos) {
             // return $request->photos;
@@ -85,8 +87,6 @@ class WholeSaleProductController extends Controller
         $new->tags = $request->tags;
         $new->description = $request->description;
         $new->price = $request->price;
-        $new->colors = $request->colors;
-        $new->sizes = $request->sizes;
         // $new->cash_on_delivery = $request->cash_on_delivery;
         $new->featured = $request->featured;
         // $new->todays_deal = $request->todays_deal;
@@ -101,6 +101,21 @@ class WholeSaleProductController extends Controller
         }
         $new->slug = $request->slug;
         $new->save();
+
+        
+        if($request->color != null)
+        {
+            foreach($request->color as $item)
+            {
+                $color = new Varient();
+                $color->product_id = $new->id;
+                $color->color = $item->color;
+                $color->price = $item->color_price;
+                $color->available = $item->available;
+                $color->save();
+            }
+
+        }
 
         if($request->discount != null)
         {
@@ -182,13 +197,26 @@ class WholeSaleProductController extends Controller
         $update->user_id = $request->user_id;
         $update->category_id = $request->category_id;
         $update->weight = $request->weight;
+        $update->year = $request->year;
         $update->unit = $request->unit;
         $update->sku = $request->sku;
         $update->brand_id = $request->brand_id;
-        $update->model = $request->model;
+        $update->model_id = $request->model_id;
 
         if ($request->file('photos')) {
             $ProductGallery = array(); // Initialize the array
+
+            if($update->photos != null)
+            {
+                foreach($update->photos as $item)
+                {
+                    $path = 'app/public'.$item;
+                    if (Storage::exists($path)) {
+                        // Delete the file
+                        Storage::delete($path);
+                    }
+                }
+            }
         
             foreach ($request->file('photos') as $photo) {
                 $file = $photo;
@@ -202,6 +230,12 @@ class WholeSaleProductController extends Controller
 
         if($request->file('thumbnail_img'))
         {
+            $path = 'app/public'.$update->thumbnail_img;
+            if (Storage::exists($path)) {
+                // Delete the file
+                Storage::delete($path);
+            }
+
                 $file= $request->thumbnail_img;
                 $filename= date('YmdHis').$file->getClientOriginalName();
                 $file->storeAs('public', $filename);
@@ -218,6 +252,12 @@ class WholeSaleProductController extends Controller
         $update->meta_description = $request->meta_description;
         if($request->file('meta_img'))
         {
+            $path = 'app/public'.$update->meta_img;
+            if (Storage::exists($path)) {
+                // Delete the file
+                Storage::delete($path);
+            }
+
                 $file= $request->meta_img;
                 $filename= date('YmdHis').$file->getClientOriginalName();
                 $file->storeAs('public', $filename);
@@ -225,6 +265,30 @@ class WholeSaleProductController extends Controller
         }
         $update->slug = $request->slug;
         $update->save();
+
+        if ($request->color != null) {
+            foreach ($request->color as $colorData) {
+                // Check if the color already exists
+                $color = Varient::where('product_id', $update->id)
+                    ->where('color', $colorData['color'])
+                    ->first();
+        
+                if ($color) {
+                    // Update existing color data
+                    $color->price = $colorData['price'];
+                    $color->available = $colorData['available'];
+                    $color->save();
+                } else {
+                    // Create a new color record
+                    $color = new Varient();
+                    $color->product_id = $update->id;
+                    $color->color = $colorData['color'];
+                    $color->price = $colorData['price'];
+                    $color->available = $colorData['available'];
+                    $color->save();
+                }
+            }
+        }
 
         if($request->discount != null)
         {
@@ -278,18 +342,27 @@ class WholeSaleProductController extends Controller
             $shipping->save();
         }
 
-        if($request->wholesale_price != null)
-        {
-            WholesaleProduct::where('product_id',$update->id)->delete();
-
-            foreach($request->wholesale_price as $price)
-            {
-                $wholesale = new WholesaleProduct();
-                $wholesale->product_id = $update->id;
-                $wholesale->wholesale_price = $price;
-                $wholesale->wholesale_min_qty = $request->wholesale_min_qty;
-                $wholesale->wholesale_max_qty = $request->wholesale_max_qty;
-                $wholesale->save();               
+        if ($request->wholesale_price != null) {
+            // Fetch existing wholesale data
+            $existingWholesaleData = WholesaleProduct::where('product_id', $update->id)->get();
+        
+            foreach ($request->wholesale_price as $index => $price) {
+                if (isset($existingWholesaleData[$index])) {
+                    // Update existing data
+                    $existingWholesale = $existingWholesaleData[$index];
+                    $existingWholesale->wholesale_price = $price;
+                    $existingWholesale->wholesale_min_qty = $request->wholesale_min_qty;
+                    $existingWholesale->wholesale_max_qty = $request->wholesale_max_qty;
+                    $existingWholesale->save();
+                } else {
+                    // Add new data
+                    $wholesale = new WholesaleProduct();
+                    $wholesale->product_id = $update->id;
+                    $wholesale->wholesale_price = $price;
+                    $wholesale->wholesale_min_qty = $request->wholesale_min_qty;
+                    $wholesale->wholesale_max_qty = $request->wholesale_max_qty;
+                    $wholesale->save();
+                }
             }
         }
 

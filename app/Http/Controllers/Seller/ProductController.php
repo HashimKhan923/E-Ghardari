@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Customer;
+namespace App\Http\Controllers\Seller;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -9,6 +9,10 @@ use App\Models\Discount;
 use App\Models\Shipping;
 use App\Models\Stock;
 use App\Models\Tax;
+use App\Models\WholesaleProduct;
+use App\Models\SubscribeUser;
+use App\Models\DealProduct;
+use App\Models\Varient;
 use Carbon\Carbon;
 
 use Illuminate\Support\Facades\Storage;
@@ -24,16 +28,20 @@ class ProductController extends Controller
 
     public function create(Request $request)
     {
-        $new = new Product();
+        $checkPackage = SubscribeUser::where('user_id',auth()->user()->id)->first();
+        if($checkPackage)
+        {
+            $new = new Product();
         $new->name = $request->name;
         $new->added_by = 'seller';
         $new->user_id = $request->user_id;
         $new->category_id = $request->category_id;
         $new->weight = $request->weight;
+        $new->year = $request->year;
         $new->unit = $request->unit;
         $new->sku = $request->sku;
         $new->brand_id = $request->brand_id;
-        $new->model = $request->model;
+        $new->model_id = $request->model_id;
 
         if ($request->file('photos')) {
             $ProductGallery = array(); // Initialize the array
@@ -58,8 +66,6 @@ class ProductController extends Controller
         $new->tags = $request->tags;
         $new->description = $request->description;
         $new->price = $request->price;
-        $new->colors = $request->colors;
-        $new->sizes = $request->sizes;
         $new->cash_on_delivery = $request->cash_on_delivery;
         $new->featured = $request->featured;
         $new->todays_deal = $request->todays_deal;
@@ -75,6 +81,21 @@ class ProductController extends Controller
         $new->slug = $request->slug;
         $new->sku = $request->sku;
         $new->save();
+
+        
+        if($request->color != null)
+        {
+            foreach($request->color as $item)
+            {
+                $color = new Varient();
+                $color->product_id = $new->id;
+                $color->color = $item->color;
+                $color->price = $item->price;
+                $color->available = $item->available;
+                $color->save();
+            }
+
+        }
 
         if($request->discount != null)
         {
@@ -141,8 +162,22 @@ class ProductController extends Controller
             }
         }
 
+        $dedect = SubscribeUser::where('user_id',auth()->user()->id)->first();
+        $dedect->product_upload_limit = $dedect->product_upload_limit - 1;
+        $dedect->save();
+
+
+
         $response = ['status'=>true,"message" => "Product Added Successfully!"];
         return response($response, 200);
+
+        }
+        else
+        {
+            $response = ['status'=>true,"message" => "you dont have any subscription to upload new product. please buy any subscription to upload products!"];
+            return response($response, 401);
+        }
+        
         
 
     }
@@ -156,13 +191,26 @@ class ProductController extends Controller
         $update->user_id = $request->user_id;
         $update->category_id = $request->category_id;
         $update->weight = $request->weight;
+        $update->year = $request->year;
         $update->unit = $request->unit;
         $update->sku = $request->sku;
         $update->brand_id = $request->brand_id;
-        $update->model = $request->model;
+        $update->model_id = $request->model_id;
 
         if ($request->file('photos')) {
             $ProductGallery = array(); // Initialize the array
+
+            if($update->photos != null)
+            {
+                foreach($update->photos as $item)
+                {
+                    $path = 'app/public'.$item;
+                    if (Storage::exists($path)) {
+                        // Delete the file
+                        Storage::delete($path);
+                    }
+                }
+            }
         
             foreach ($request->file('photos') as $photo) {
                 $file = $photo;
@@ -176,6 +224,12 @@ class ProductController extends Controller
 
         if($request->file('thumbnail_img'))
         {
+            $path = 'app/public'.$update->thumbnail_img;
+            if (Storage::exists($path)) {
+                // Delete the file
+                Storage::delete($path);
+            }
+
                 $file= $request->thumbnail_img;
                 $filename= date('YmdHis').$file->getClientOriginalName();
                 $file->storeAs('public', $filename);
@@ -184,7 +238,6 @@ class ProductController extends Controller
         $update->tags = $request->tags;
         $update->description = $request->description;
         $update->price = $request->price;
-        $update->colors = $request->colors;
         $update->sizes = $request->sizes;
         $update->featured = $request->featured;
         $update->todays_deal = $request->todays_deal;
@@ -192,6 +245,11 @@ class ProductController extends Controller
         $update->meta_description = $request->meta_description;
         if($request->file('meta_img'))
         {
+            $path = 'app/public'.$update->meta_img;
+            if (Storage::exists($path)) {
+                // Delete the file
+                Storage::delete($path);
+            }
                 $file= $request->meta_img;
                 $filename= date('YmdHis').$file->getClientOriginalName();
                 $file->storeAs('public', $filename);
@@ -200,6 +258,30 @@ class ProductController extends Controller
         $update->slug = $request->slug;
         $update->sku = $request->sku;
         $update->save();
+
+        if ($request->color != null) {
+            foreach ($request->color as $colorData) {
+                // Check if the color already exists
+                $color = Varient::where('product_id', $update->id)
+                    ->where('color', $colorData['color'])
+                    ->first();
+        
+                if ($color) {
+                    // Update existing color data
+                    $color->price = $colorData['price'];
+                    $color->available = $colorData['available'];
+                    $color->save();
+                } else {
+                    // Create a new color record
+                    $color = new Varient();
+                    $color->product_id = $update->id;
+                    $color->color = $colorData['color'];
+                    $color->price = $colorData['price'];
+                    $color->available = $colorData['available'];
+                    $color->save();
+                }
+            }
+        }
 
         if($request->discount != null)
         {
@@ -277,16 +359,19 @@ class ProductController extends Controller
     {
         $file = Product::find($id);
 
-
-        foreach($file->photos as $photosList)
+        if($file->photos != null )
         {
-         $DeletePhotos = 'app/public'.$photosList;
-         if (Storage::exists($DeletePhotos))
-         {
-             Storage::delete($DeletePhotos);
-         }
-   
-        }  
+            foreach($file->photos as $photosList)
+            {
+             $DeletePhotos = 'app/public'.$photosList;
+             if (Storage::exists($DeletePhotos))
+             {
+                 Storage::delete($DeletePhotos);
+             }
+       
+            }  
+        }
+
 
 
 
@@ -316,11 +401,11 @@ class ProductController extends Controller
 
         if($is_published->published == 0)
         {
-            $is_published = 1;
+            $is_published->published = 1;
         }
         else
         {
-            $is_published = 0;
+            $is_published->published = 0;
         }
 
         $is_published->save();
